@@ -1,0 +1,61 @@
+body,html {
+  margin: 0;
+  padding: 0;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  height: 100vh;
+  overflow-y: hidden;
+  /* overflow-x: hidden; */
+  background: #000;
+}
+
+.container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  height: 100%;
+}
+
+.img-container {
+  margin: 0;
+}
+
+.img-hor {
+  display: block;
+  height: 100%;
+}
+
+.button {
+  position: absolute;
+  bottom: 100px;
+  right: 100px;
+  padding: 4px 8px;
+  background-color: #fff0;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  border-bottom: #fff 3px solid;
+  font-size: 4vh;
+  display: none;
+}
+
+.button:hover {
+  opacity: .75;
+}
+
+
+.button-roboto {
+  font-family: "Roboto", serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+  font-variation-settings: "wdth" 100;
+}
