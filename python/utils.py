@@ -23,7 +23,7 @@ except:
   GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 
-DEFAULT_IMAGE_DESCRIPTION_PROMPT = "Describe this image's style in a way that can I use as a prompt to generate similar images using generative diffusion models. Use 100 words or less. Only describe style, not specific objects. Start the description with 'an image that ...' "  
+DEFAULT_IMAGE_DESCRIPTION_PROMPT = "Describe this image's style in a way that can I use as a prompt to generate similar images using generative diffusion models. Use 48 words or less. Only describe style, not specific objects. Start the description with 'an image that ...' "
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
 def get64(img):
