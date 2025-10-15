@@ -3,7 +3,6 @@
 import base64
 import gc
 import io
-import json
 import numpy as np
 import os
 import requests
@@ -18,13 +17,35 @@ except:
   print("no pytorch")
 
 try:
-  from env import GEMINI_API_KEY
+  from env import GEMINI_API_KEY, NEWSDATA_API_KEY
 except:
   GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+  NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
 
 
-DEFAULT_IMAGE_DESCRIPTION_PROMPT = "Describe this image's style in a way that can I use as a prompt to generate similar images using generative diffusion models. Use 48 words or less. Only describe style, not specific objects. Start the description with 'an image that ...' "
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+DEFAULT_IMAGE_DESCRIPTION_PROMPT = "Describe this image's style in a way that can I use as a prompt to generate similar images using generative diffusion models. Use 48 words or less. Only describe style, not specific objects. Start the description with 'an image that ...' "
+
+NEWSDATA_URL = "https://newsdata.io/api/1/latest"
+NEWSDATA_EXCLUDE_FIELDS = [
+  "link",
+  "source_url",
+  "source_icon",
+  "creator",
+  "video_url",
+  "pubDateTZ",
+  "content",
+  "country",
+  "language",
+  "pubDateTZ",
+  "sentiment",
+  "sentiment_stats",
+  "ai_tag",
+  "ai_region",
+  "ai_org",
+  "ai_summary",
+  "ai_content",
+]
 
 def get64(img):
   if type(img) == str:
@@ -35,6 +56,14 @@ def get64(img):
     img.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
   else:
+    return ""
+
+def get_img(url):
+  try:
+    res = requests.get(url, timeout=10)
+    res.raise_for_status()
+    return PImage.open(io.BytesIO(res.content))
+  except:
     return ""
 
 def clear_from_gpu(pipe):
@@ -78,7 +107,6 @@ def get_input_images(img, keep_width, size):
 
   return img_in, mask
 
-# "Describe this image's style in a way that can I use as a prompt to generate similar images using generative diffusion models. Use 100 words or less. Only describe style, not specific objects. Start the description with 'an image that ...' "
 def build_prompt(prompt_text, img):
   return {
     "contents": [{
@@ -100,3 +128,31 @@ def get_img_description(img):
   res_obj = res.json()
   return res_obj["candidates"][0]["content"]["parts"][0]["text"]
 
+def get_articles(*, q=None, cat=None, n_articles=10):
+  news_params = {
+    "apikey": NEWSDATA_API_KEY,
+    "language": "en",
+    "image": 1,
+    "excludefield": ",".join(NEWSDATA_EXCLUDE_FIELDS),
+  }
+
+  if q:
+    news_params["q"]= q
+
+  if cat:
+    news_params["category"] = cat
+  else:
+    news_params["excludecategory"] = "food,lifestyle,sports,tourism"
+
+  results = []
+  n_queries = n_articles//10 if n_articles%10==0 else n_articles//10+1
+  for idx in range(n_queries):
+    res = requests.get(NEWSDATA_URL, params=news_params)
+    res_obj = res.json()
+    if res_obj["status"] == "success":
+      results += res_obj["results"]
+      news_params["page"] = res_obj["nextPage"]
+    else:
+      raise Exception("Error in NewsData API", res_obj)
+
+  return results[:n_articles]
