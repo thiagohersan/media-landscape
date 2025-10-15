@@ -3,6 +3,7 @@
 import base64
 import gc
 import io
+import json
 import numpy as np
 import os
 import pandas as pd
@@ -14,9 +15,11 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 try:
   import torch
-  from diffusers import AutoPipelineForInpainting, ControlNetModel
+  from diffusers import AutoPipelineForInpainting
+  from torch import Generator
   from torch.cuda import empty_cache
 except:
+  Generator = None
   print("no pytorch")
 
 try:
@@ -27,7 +30,22 @@ except:
 
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-DEFAULT_IMAGE_DESCRIPTION_PROMPT = "Describe this image's style in a way that can I use as a prompt to generate similar images using generative diffusion models. Use 48 words or less. Only describe style, not specific objects. Start the description with 'an image that ...' "
+
+DEFAULT_IMAGE_DESCRIPTION_PROMPT_00 = (
+  "Describe this image's style in a way that I can use as a prompt to generate "
+  "similar images using generative diffusion models. "
+  "Use 48 words or less. Only describe style, not specific objects. "
+  "Start the description with 'an image that depicts ...'"
+)
+
+DEFAULT_IMAGE_DESCRIPTION_PROMPT = (
+  "Describe this image's style and content separately but in a way that I can use them "
+  "as prompts to generate similar images using generative diffusion models. "
+  "Use 24 words or less for each description. "
+  "When describing style, don't describe specific objects; "
+  "and when describing content, focus on objects and subjects and don't describe style. "
+  "Start both descriptions with 'an image that depicts ...'"
+)
 
 NEWSDATA_URL = "https://newsdata.io/api/1/latest"
 NEWSDATA_EXCLUDE_FIELDS = [
@@ -111,6 +129,15 @@ def get_input_images(img, keep_width, size):
   return img_in, mask
 
 def build_prompt(prompt_text, img):
+  res_schema = {
+    "type": "object",
+    "properties": {
+      "style": { "type": "string" },
+      "content": { "type": "string" },
+    },
+    "required": ["style", "content"]
+  }
+
   return {
     "contents": [{
       "parts": [
@@ -118,7 +145,11 @@ def build_prompt(prompt_text, img):
         { "text": prompt_text }
       ]
     }],
-    "generationConfig": { "temperature": 0.5 }
+    "generationConfig": {
+      "responseMimeType": "application/json",
+      "responseSchema": res_schema,
+      "temperature": 0.25
+    }
   }
 
 def get_img_description(img):
@@ -129,7 +160,7 @@ def get_img_description(img):
   post_data = build_prompt(DEFAULT_IMAGE_DESCRIPTION_PROMPT, img)
   res = requests.post(GEMINI_URL, headers=headers, json=post_data)
   res_obj = res.json()
-  return res_obj["candidates"][0]["content"]["parts"][0]["text"]
+  return json.loads(res_obj["candidates"][0]["content"]["parts"][0]["text"])
 
 def get_articles(*, q=None, cat=None, n_articles=10):
   news_params = {
@@ -145,7 +176,8 @@ def get_articles(*, q=None, cat=None, n_articles=10):
   if cat:
     news_params["category"] = cat
   else:
-    news_params["excludecategory"] = "food,lifestyle,sports,tourism,business"
+    news_params["category"] = "top"
+    # news_params["excludecategory"] = "food,lifestyle,sports,tourism,business"
 
   results = []
   n_queries = n_articles//10 if n_articles%10==0 else n_articles//10+1
@@ -168,6 +200,7 @@ def clean_text(txt):
   txt = txt.replace("2025", "")
   txt = txt.replace("news", "")
   txt = txt.replace("new", "")
+  txt = txt.replace("said", "")
   txt = txt.strip()
   txt = txt.translate(str.maketrans('', '', string.punctuation))
   return txt
