@@ -225,3 +225,11 @@ def get_articles_with_top_words(articles, *, n_words, n_articles):
   article_idxs_by_top_word_count = (-article_top_word_cnts).argsort(axis=0)[:n_articles]
 
   return pd.DataFrame(article_idxs_by_top_word_count, columns=top_words)
+
+def get_article_images_by_size(articles, idxs, limit=None):
+  imgs = [get_img(articles[idx]["image_url"]) for idx in list(set(idxs))]
+  imgs = [x for x in imgs if type(x) != str]
+  imgs_by_size = sorted(imgs, key=lambda x: x.size[0]*x.size[1], reverse=True)
+  if limit:
+    return imgs_by_size[:limit]
+  return imgs_by_size
