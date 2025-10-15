@@ -5,9 +5,12 @@ import gc
 import io
 import numpy as np
 import os
+import pandas as pd
 import requests
+import string
 
 from PIL import Image as PImage
+from sklearn.feature_extraction.text import CountVectorizer
 
 try:
   import torch
@@ -142,7 +145,7 @@ def get_articles(*, q=None, cat=None, n_articles=10):
   if cat:
     news_params["category"] = cat
   else:
-    news_params["excludecategory"] = "food,lifestyle,sports,tourism"
+    news_params["excludecategory"] = "food,lifestyle,sports,tourism,business"
 
   results = []
   n_queries = n_articles//10 if n_articles%10==0 else n_articles//10+1
@@ -156,3 +159,36 @@ def get_articles(*, q=None, cat=None, n_articles=10):
       raise Exception("Error in NewsData API", res_obj)
 
   return results[:n_articles]
+
+def clean_text(txt):
+  if type(txt) == list:
+    txt = " ".join(txt)
+  txt = txt.lower()
+  txt = txt.replace("/", " ")
+  txt = txt.replace("2025", "")
+  txt = txt.replace("news", "")
+  txt = txt.replace("new", "")
+  txt = txt.strip()
+  txt = txt.translate(str.maketrans('', '', string.punctuation))
+  return txt
+
+def get_articles_with_top_words(articles, *, n_words, n_articles):
+  titles = [clean_text(x["title"]) if x["title"] else " " for x in articles]
+  keywords = [clean_text(x["keywords"]) if x["keywords"] else " " for x in articles]
+  descriptions = [clean_text(x["description"]) if x["description"] else " " for x in articles]
+
+  txt = [f"{t} {k} {d}" for t,k,d in zip(titles, keywords, descriptions)]
+  
+  mCV = CountVectorizer(stop_words="english", min_df=5, max_df=0.95, max_features=10_000)
+
+  cnt_vct = mCV.fit_transform(txt)
+  word_counts = cnt_vct.sum(axis=0).A.reshape(-1)
+  word_idxs_by_cnt = (-word_counts).argsort()
+
+  vocab = mCV.get_feature_names_out()
+  top_words = vocab[word_idxs_by_cnt[:n_words]]
+
+  article_top_word_cnts = cnt_vct[:, word_idxs_by_cnt[:n_words]].toarray()
+  article_idxs_by_top_word_count = (-article_top_word_cnts).argsort(axis=0)[:n_articles]
+
+  return pd.DataFrame(article_idxs_by_top_word_count, columns=top_words)
