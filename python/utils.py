@@ -40,7 +40,7 @@ DEFAULT_IMAGE_DESCRIPTION_PROMPT = (
   "When describing style, don't describe specific objects; "
   "and when describing content, focus on objects and subjects and don't describe style. "
   "Start both descriptions with 'an image that depicts ...'."
-  "If the image shows a logo, a map or a diagram, or is just text, use the word 'logo' in the content description."
+  "If the image shows a logo, a map or a diagram, or has a lot of text, use the word 'logo' in the content description."
   "If the image shows a weather report, weatherman or weather woman, use the term 'graphic overlay' in the content description."
 )
 
