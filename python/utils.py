@@ -44,7 +44,9 @@ DEFAULT_IMAGE_DESCRIPTION_PROMPT = (
   "Use 24 words or less for each description. "
   "When describing style, don't describe specific objects; "
   "and when describing content, focus on objects and subjects and don't describe style. "
-  "Start both descriptions with 'an image that depicts ...'"
+  "Start both descriptions with 'an image that depicts ...'."
+  "If the image shows a logo, a map or a diagram, or is just text, use the word 'logo' in the content description."
+  "If the image shows a weather report, weatherman or weather woman, use the term 'graphic overlay' in the content description."
 )
 
 NEWSDATA_URL = "https://newsdata.io/api/1/latest"
@@ -83,7 +85,7 @@ def get_img(url):
   try:
     res = requests.get(url, timeout=10)
     res.raise_for_status()
-    return PImage.open(io.BytesIO(res.content))
+    return PImage.open(io.BytesIO(res.content)).convert("RGB")
   except:
     return ""
 
@@ -160,7 +162,12 @@ def get_img_description(img):
   post_data = build_prompt(DEFAULT_IMAGE_DESCRIPTION_PROMPT, img)
   res = requests.post(GEMINI_URL, headers=headers, json=post_data)
   res_obj = res.json()
-  return json.loads(res_obj["candidates"][0]["content"]["parts"][0]["text"])
+
+  if "candidates" in res_obj:
+    return json.loads(res_obj["candidates"][0]["content"]["parts"][0]["text"])
+  else:
+    print(res_obj)
+    return {"content": "", "style": ""}
 
 def get_articles(*, q=None, cat=None, n_articles=10):
   news_params = {
@@ -227,9 +234,9 @@ def get_articles_with_top_words(articles, *, n_words, n_articles):
   return pd.DataFrame(article_idxs_by_top_word_count, columns=top_words)
 
 def get_article_images_by_size(articles, idxs, limit=None):
-  imgs = [get_img(articles[idx]["image_url"]) for idx in list(set(idxs))]
-  imgs = [x for x in imgs if type(x) != str]
-  imgs_by_size = sorted(imgs, key=lambda x: x.size[0]*x.size[1], reverse=True)
+  imgs = [{"image": get_img(articles[idx]["image_url"]), "idx": idx} for idx in list(set(idxs))]
+  imgs = [x for x in imgs if type(x["image"]) != str]
+  imgs_by_size = sorted(imgs, key=lambda x: x["image"].size[0]*x["image"].size[1], reverse=True)
   if limit:
     return imgs_by_size[:limit]
   return imgs_by_size
