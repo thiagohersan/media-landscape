@@ -175,6 +175,7 @@ def get_articles(*, q=None, cat=None, n_articles=10):
     "language": "en",
     "image": 1,
     "excludefield": ",".join(NEWSDATA_EXCLUDE_FIELDS),
+    "removeduplicate": 1
   }
 
   if q:
@@ -197,7 +198,8 @@ def get_articles(*, q=None, cat=None, n_articles=10):
     else:
       raise Exception("Error in NewsData API", res_obj)
 
-  return results[:n_articles]
+  results_unique = list({x["article_id"]: x for x in results}.values())
+  return results_unique[:n_articles]
 
 def clean_text(txt):
   if type(txt) == list:
