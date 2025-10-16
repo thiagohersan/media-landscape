@@ -1,0 +1,167 @@
+from os import getenv, makedirs
+
+try:
+  from env import GEMINI_API_KEY
+except:
+  GEMINI_API_KEY = getenv("GEMINI_API_KEY")
+
+import numpy as np
+
+from PIL import Image as PImage
+from random import randint, sample
+from utils import get_img_description
+
+try:
+  import torch
+  from diffusers import AutoPipelineForInpainting
+except:
+  print("no pytorch")
+
+
+# "runwayml/stable-diffusion-inpainting"
+# "stable-diffusion-v1-5/stable-diffusion-inpainting"
+# "stabilityai/stable-diffusion-2-inpainting"
+class LandscapeGenerator:
+  @classmethod
+  def get_pipeline(cls, model):
+    return AutoPipelineForInpainting.from_pretrained(
+      model,
+      torch_dtype=torch.float16,
+      variant="fp16",
+      safety_checker=None
+    ).to("cuda")
+
+  @classmethod
+  def resize_by_height(cls, src, height):
+    iw, ih = src.size
+    nw = int(iw * height / ih)
+    return src.resize((nw, height)).convert("RGB")
+
+  @classmethod
+  def create_mask(cls, keep_width, size):
+    img_in = PImage.new("L", size)
+    iw, ih = size
+    img_in_pxs = [(i % iw >= keep_width) * 255 for i in range(iw * ih)]
+    img_in.putdata(img_in_pxs)
+    return img_in.convert("RGB")
+
+  @classmethod
+  def create_black_mask_like(cls, img):
+    black_mask = PImage.new("L", img.size)
+    black_mask_pxs = [0 for i in range(img.size[0] * img.size[1])]
+    black_mask.putdata(black_mask_pxs)
+    return black_mask.convert("RGB")
+
+  @classmethod
+  def get_input_images(cls, img, keep_width, size):
+    img_np = np.array(cls.resize_by_height(img, height=size[1]))
+    bgd_np = np.array(cls.create_mask(keep_width=keep_width, size=size))
+    mask = cls.create_mask(keep_width=keep_width, size=size)
+
+    bgd_np[:, :keep_width] = img_np[:, -keep_width:]
+    img_in = PImage.fromarray(bgd_np)
+
+    return img_in, mask
+
+  def __init__(self, data, model):
+    self.data = data
+    self.pipe = LandscapeGenerator.get_pipeline(model)
+
+  def build_prompt(self, img=None, prompt_content=None, prompt_style=None):
+    if img:
+      description = get_img_description(img)
+      prompt_style = description["style"][:-1]
+    if prompt_content is None:
+      prompt_content = self.data[randint(0, len(self.data) - 1)]["content"][-1]
+    if prompt_style is None:
+      prompt_style = self.data[randint(0, len(self.data) - 1)]["style"][-1]
+
+    content_modifier_options = [
+      "things on fire",
+      "floods",
+      "droughts",
+      "environmental crisis",
+      "global warming",
+      "trash and rubble",
+    ]
+
+    k = randint(1, 3)
+    selections = sample(content_modifier_options, k)
+    content_modifier = ", ".join(selections)
+
+    return f"environmental crisis version of {prompt_content}, but with {content_modifier} everywhere. Use the style of {prompt_style}"
+
+  def gen_image(self, prompt, img_in, mask_in):
+    guidance_scale = randint(8, 24)
+    output = self.pipe(
+      prompt=prompt,
+      negative_prompt="repetitive, distortion, glitch, borders, stretched, frames, breaks, multiple rows, gore, zombies, violence",
+      image=img_in,
+      mask_image=mask_in,
+      width=img_in.size[0], height=img_in.size[1],
+      guidance_scale=float(guidance_scale),
+      num_inference_steps=24,
+    )
+    return output.images[0]
+
+  def gen_landscape(self, keep_width=256, size=(1440, 512), n=4, label="mural", seed_img=None):
+    if seed_img is None:
+      img_idx = randint(0, len(self.data) - 1)
+      seed_img = self.data[img_idx]["image"]
+      seed_img = LandscapeGenerator.resize_by_height(seed_img, size[1])
+      prompt = self.build_prompt(prompt_content=self.data[img_idx]["content"][-1], prompt_style=self.data[img_idx]["style"][-1])
+    else:
+      seed_img = LandscapeGenerator.resize_by_height(seed_img, size[1])
+      prompt = self.build_prompt(img=seed_img)
+
+    makedirs(f"./imgs/{label}/", exist_ok=True)
+    seed_img.save(f"./imgs/{label}/{label}_00.jpg")
+
+    landscape_imgs = [seed_img]
+    landscape_width = seed_img.size[0]
+
+    img_in, mask_in = LandscapeGenerator.get_input_images(seed_img, keep_width=keep_width, size=size)
+
+    for i in range(1, n+1):
+      new_img = self.gen_image(prompt, img_in, mask_in)
+      img_out_np = np.array(new_img)[:, keep_width:]
+      img_out = PImage.fromarray(img_out_np)
+
+      landscape_imgs.append(img_out)
+      landscape_width += img_out.size[0]
+      img_out.save(f"./imgs/{label}/{label}_{('0'+str(i))[-2:]}.jpg")
+
+      img_in, mask_in = LandscapeGenerator.get_input_images(img_out, keep_width=keep_width, size=size)
+
+      prompt_rand = randint(0, 100)
+      if prompt_rand < 80:
+        content_style_idx = randint(0, len(self.data) - 1)
+        prompt_content = self.data[content_style_idx]["content"][-1]
+        prompt_style = self.data[content_style_idx]["style"][-1]
+        prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
+      elif prompt_rand < 0:
+        img_idx = randint(0, len(self.data) - 1)
+        news_img = self.data[img_idx]["image"]
+        news_img = LandscapeGenerator.resize_by_height(news_img, size[1])
+        prompt_content = self.data[img_idx]["content"][-1]
+        prompt_style = self.data[img_idx]["style"][-1]
+        prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
+
+        available_width = size[0] - 3 * keep_width
+        if news_img.size[0] > available_width:
+          news_img = news_img.crop((0, 0, available_width, size[1]))
+
+        news_mask = LandscapeGenerator.create_black_mask_like(news_img)
+        img_in.paste(news_img, (3 * keep_width, 0))
+        mask_in.paste(news_mask, (3 * keep_width, 0))
+      else:
+        prompt = self.build_prompt(img=img_out)
+
+    landscape_np = np.zeros((size[1], landscape_width, 3), dtype=np.uint8)
+    cw = 0
+    for img in landscape_imgs:
+      landscape_np[:, cw:cw + img.size[0]] = np.array(img)[:, :]
+      cw += img.size[0]
+
+    landscape_out = PImage.fromarray(landscape_np)
+    landscape_out.save(f"./imgs/{label}/{label}.jpg")
