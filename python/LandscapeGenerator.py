@@ -38,27 +38,38 @@ class LandscapeGenerator:
     return src.resize((nw, height)).convert("RGB")
 
   @classmethod
-  def create_mask(cls, keep_width, size):
+  def create_mask(cls, keep_width, size, right_keep_width=None):
     img_in = PImage.new("L", size)
     iw, ih = size
-    img_in_pxs = [(i % iw >= keep_width) * 255 for i in range(iw * ih)]
+    if right_keep_width is not None:
+      rkw = right_keep_width
+      mask_start = (iw - rkw) if (iw - rkw) > (3 * keep_width) else 3 * keep_width
+      img_in_pxs = [((i % iw) >= keep_width and (i % iw) <= mask_start) * 255 for i in range(iw * ih)]
+    else:
+      img_in_pxs = [(i % iw >= keep_width) * 255 for i in range(iw * ih)]
     img_in.putdata(img_in_pxs)
     return img_in.convert("RGB")
 
   @classmethod
-  def create_black_mask_like(cls, img):
-    black_mask = PImage.new("L", img.size)
-    black_mask_pxs = [0 for i in range(img.size[0] * img.size[1])]
-    black_mask.putdata(black_mask_pxs)
-    return black_mask.convert("RGB")
+  def get_input_images(cls, left_img, keep_width, size, right_img=None):
+    l_img_np = np.array(cls.resize_by_height(left_img, height=size[1]))
 
-  @classmethod
-  def get_input_images(cls, img, keep_width, size):
-    img_np = np.array(cls.resize_by_height(img, height=size[1]))
-    bgd_np = np.array(cls.create_mask(keep_width=keep_width, size=size))
-    mask = cls.create_mask(keep_width=keep_width, size=size)
+    if right_img is not None:
+      r_img_np = np.array(cls.resize_by_height(right_img, height=size[1]))
+      bgd_np = np.array(cls.create_mask(keep_width=keep_width, size=size, right_keep_width=right_img.size[0]))
+      mask = cls.create_mask(keep_width=keep_width, size=size, right_keep_width=right_img.size[0])
+    else:
+      bgd_np = np.array(cls.create_mask(keep_width=keep_width, size=size))
+      mask = cls.create_mask(keep_width=keep_width, size=size)
 
-    bgd_np[:, :keep_width] = img_np[:, -keep_width:]
+    bgd_np[:, :keep_width] = l_img_np[:, -keep_width:]
+
+    if right_img is not None:
+      rkw = right_img.size[0]
+      right_start = (size[0] - rkw) if (size[0] - rkw) > (3 * keep_width) else 3 * keep_width
+      right_end = min(size[0], 3 * keep_width + rkw)
+      bgd_np[:, right_start:right_end]= r_img_np[:, :right_end - right_start]
+
     img_in = PImage.fromarray(bgd_np)
 
     return img_in, mask
@@ -123,8 +134,8 @@ class LandscapeGenerator:
     img_in, mask_in = LandscapeGenerator.get_input_images(seed_img, keep_width=keep_width, size=size)
 
     for i in range(1, n+1):
-      new_img = self.gen_image(prompt, img_in, mask_in)
-      img_out_np = np.array(new_img)[:, keep_width:]
+      img_out_raw = self.gen_image(prompt, img_in, mask_in)
+      img_out_np = np.array(img_out_raw)[:, keep_width:]
       img_out = PImage.fromarray(img_out_np)
 
       landscape_imgs.append(img_out)
@@ -134,26 +145,20 @@ class LandscapeGenerator:
       img_in, mask_in = LandscapeGenerator.get_input_images(img_out, keep_width=keep_width, size=size)
 
       prompt_rand = randint(0, 100)
-      if prompt_rand < 80:
+      if prompt_rand < 40:
         content_style_idx = randint(0, len(self.data) - 1)
         prompt_content = self.data[content_style_idx]["content"][-1]
         prompt_style = self.data[content_style_idx]["style"][-1]
         prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
-      elif prompt_rand < 0:
+      elif prompt_rand < 80:
         img_idx = randint(0, len(self.data) - 1)
         news_img = self.data[img_idx]["image"]
-        news_img = LandscapeGenerator.resize_by_height(news_img, size[1])
         prompt_content = self.data[img_idx]["content"][-1]
         prompt_style = self.data[img_idx]["style"][-1]
         prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
 
-        available_width = size[0] - 3 * keep_width
-        if news_img.size[0] > available_width:
-          news_img = news_img.crop((0, 0, available_width, size[1]))
-
-        news_mask = LandscapeGenerator.create_black_mask_like(news_img)
-        img_in.paste(news_img, (3 * keep_width, 0))
-        mask_in.paste(news_mask, (3 * keep_width, 0))
+        news_img = LandscapeGenerator.resize_by_height(news_img, size[1])
+        img_in, mask_in = LandscapeGenerator.get_input_images(img_out, keep_width=keep_width, size=size, right_img=news_img)
       else:
         prompt = self.build_prompt(img=img_out)
 
