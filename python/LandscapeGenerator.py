@@ -5,9 +5,10 @@ try:
 except:
   GEMINI_API_KEY = getenv("GEMINI_API_KEY")
 
+import json
 import numpy as np
 
-from PIL import Image as PImage
+from PIL import Image as PImage, ImageFilter as PImageFilter
 from random import randint, sample
 from utils import get_img_description
 
@@ -44,7 +45,7 @@ class LandscapeGenerator:
     if right_keep_width is not None:
       rkw = right_keep_width
       mask_start = (iw - rkw) if (iw - rkw) > (3 * keep_width) else 3 * keep_width
-      img_in_pxs = [((i % iw) >= keep_width and (i % iw) <= mask_start) * 255 for i in range(iw * ih)]
+      img_in_pxs = [((i % iw) >= keep_width and (i % iw) < mask_start) * 255 for i in range(iw * ih)]
     else:
       img_in_pxs = [(i % iw >= keep_width) * 255 for i in range(iw * ih)]
     img_in.putdata(img_in_pxs)
@@ -71,8 +72,9 @@ class LandscapeGenerator:
       bgd_np[:, right_start:right_end]= r_img_np[:, :right_end - right_start]
 
     img_in = PImage.fromarray(bgd_np)
+    mask_blurred = mask.filter(PImageFilter.GaussianBlur(radius=(4, 0)))
 
-    return img_in, mask
+    return img_in, mask_blurred
 
   def __init__(self, data, model):
     self.data = data
@@ -94,24 +96,29 @@ class LandscapeGenerator:
       "environmental crisis",
       "global warming",
       "trash and rubble",
+      "environmental crisis",
+      "collapsed buildings",
+      "vultures and rats"
     ]
 
     k = randint(1, 3)
     selections = sample(content_modifier_options, k)
     content_modifier = ", ".join(selections)
 
-    return f"environmental crisis version of {prompt_content}, but with {content_modifier} everywhere. Use the style of {prompt_style}"
+    return (
+      f"Continuous and smooth version of {prompt_content}, but with {content_modifier} everywhere."
+      "Use the style of {prompt_style}"
+    )
 
   def gen_image(self, prompt, img_in, mask_in):
-    guidance_scale = randint(8, 24)
     output = self.pipe(
       prompt=prompt,
-      negative_prompt="repetitive, distortion, glitch, borders, stretched, frames, breaks, multiple rows, gore, zombies, violence",
+      negative_prompt="repetitive, distortion, glitch, borders, stretched, frames, breaks, multiple rows, gore, zombies, violence, splits, maps, diagrams, text, font, logos, branding",
       image=img_in,
       mask_image=mask_in,
       width=img_in.size[0], height=img_in.size[1],
-      guidance_scale=float(guidance_scale),
-      num_inference_steps=24,
+      guidance_scale=16.0,
+      num_inference_steps=20,
     )
     return output.images[0]
 
@@ -120,16 +127,19 @@ class LandscapeGenerator:
       img_idx = randint(0, len(self.data) - 1)
       seed_img = self.data[img_idx]["image"]
       seed_img = LandscapeGenerator.resize_by_height(seed_img, size[1])
+      seed_img_id = self.data[img_idx]["article_id"]
       prompt = self.build_prompt(prompt_content=self.data[img_idx]["content"][-1], prompt_style=self.data[img_idx]["style"][-1])
     else:
       seed_img = LandscapeGenerator.resize_by_height(seed_img, size[1])
+      seed_img_id = ""
       prompt = self.build_prompt(img=seed_img)
 
     makedirs(f"./imgs/{label}/", exist_ok=True)
     seed_img.save(f"./imgs/{label}/{label}_00.jpg")
 
     landscape_imgs = [seed_img]
-    landscape_width = seed_img.size[0]
+    landscape_ids = [seed_img_id]
+    landscape_running_width = seed_img.size[0]
 
     img_in, mask_in = LandscapeGenerator.get_input_images(seed_img, keep_width=keep_width, size=size)
 
@@ -139,30 +149,34 @@ class LandscapeGenerator:
       img_out = PImage.fromarray(img_out_np)
 
       landscape_imgs.append(img_out)
-      landscape_width += img_out.size[0]
+      landscape_running_width += img_out.size[0]
       img_out.save(f"./imgs/{label}/{label}_{('0'+str(i))[-2:]}.jpg")
 
       img_in, mask_in = LandscapeGenerator.get_input_images(img_out, keep_width=keep_width, size=size)
 
       prompt_rand = randint(0, 100)
-      if prompt_rand < 40:
-        content_style_idx = randint(0, len(self.data) - 1)
-        prompt_content = self.data[content_style_idx]["content"][-1]
-        prompt_style = self.data[content_style_idx]["style"][-1]
+      if prompt_rand < 30:
+        # content_style_idx = randint(0, len(self.data) - 1)
+        # prompt_content = self.data[content_style_idx]["content"][-1]
+        # prompt_style = self.data[content_style_idx]["style"][-1]
+        # landscape_ids.append(self.data[content_style_idx]["article_id"])
+        landscape_ids.append(landscape_ids[-1])
         prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
-      elif prompt_rand < 80:
+      elif prompt_rand < 180:
         img_idx = randint(0, len(self.data) - 1)
         news_img = self.data[img_idx]["image"]
         prompt_content = self.data[img_idx]["content"][-1]
         prompt_style = self.data[img_idx]["style"][-1]
+        landscape_ids.append(self.data[img_idx]["article_id"])
         prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
 
         news_img = LandscapeGenerator.resize_by_height(news_img, size[1])
         img_in, mask_in = LandscapeGenerator.get_input_images(img_out, keep_width=keep_width, size=size, right_img=news_img)
-      else:
-        prompt = self.build_prompt(img=img_out)
+      # else:
+      #   landscape_ids.append(landscape_ids[-1])
+      #   prompt = self.build_prompt(img=img_out)
 
-    landscape_np = np.zeros((size[1], landscape_width, 3), dtype=np.uint8)
+    landscape_np = np.zeros((size[1], landscape_running_width, 3), dtype=np.uint8)
     cw = 0
     for img in landscape_imgs:
       landscape_np[:, cw:cw + img.size[0]] = np.array(img)[:, :]
@@ -170,3 +184,6 @@ class LandscapeGenerator:
 
     landscape_out = PImage.fromarray(landscape_np)
     landscape_out.save(f"./imgs/{label}/{label}.jpg")
+
+    with open(f"./imgs/{label}/{label}.json", "w") as ofp:
+      json.dump(landscape_ids, ofp, separators=(",",":"), ensure_ascii=False)
