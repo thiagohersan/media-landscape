@@ -79,10 +79,7 @@ class LandscapeGenerator:
     self.data = data
     self.pipe = LandscapeGenerator.get_pipeline(model)
 
-  def build_prompt(self, img=None, prompt_content=None, prompt_style=None):
-    if img:
-      description = get_img_description(img)
-      prompt_style = description["style"][:-1]
+  def build_prompt(self, prompt_content=None, prompt_style=None):
     if prompt_content is None:
       prompt_content = self.data[randint(0, len(self.data) - 1)]["content"][:-1]
     if prompt_style is None:
@@ -109,7 +106,7 @@ class LandscapeGenerator:
       f"Use the style of {prompt_style}."
     )
 
-  def gen_image(self, prompt, img_in, mask_in):
+  def gen_image(self, prompt, img_in, mask_in, n_images=1):
     output = self.pipe(
       prompt=prompt,
       negative_prompt="repetitive, distortion, glitch, borders, stretched, frames, breaks, multiple rows, gore, zombies, violence, splits, maps, diagrams, text, font, logos, branding",
@@ -118,23 +115,38 @@ class LandscapeGenerator:
       width=img_in.size[0], height=img_in.size[1],
       guidance_scale=16.0,
       num_inference_steps=24,
-      num_images_per_prompt=1,
+      num_images_per_prompt=n_images,
     )
-    return output.images[0]
+    return output.images
+
+  def prep_graft(self, limg, rimg, keep_width=256, right_offset=20, label="grafted"):
+    orimg = rimg.crop((right_offset + keep_width, 0, rimg.size[0], rimg.size[1]))
+    orimg.save(f"./imgs/{label}_new-right.jpg")
+
+    rimg = rimg.crop((right_offset, 0, right_offset + keep_width, rimg.size[1]))
+    description = get_img_description(limg)
+    prompt_content = None
+    prompt_style = description["style"][:-1]
+    img_in, mask_in = LandscapeGenerator.get_input_images(limg, keep_width=keep_width, size=(4*keep_width, limg.size[1]), right_img=rimg)
+    prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
+    return prompt, img_in, mask_in
 
   def gen_landscape(self, keep_width=256, size=(1440, 512), n=4, label="mural", seed_img=None):
+    makedirs(f"./imgs/{label}/", exist_ok=True)
+
     if seed_img is None:
       img_idx = randint(0, len(self.data) - 1)
       seed_img = self.data[img_idx]["image"]
-      seed_img = LandscapeGenerator.resize_by_height(seed_img, size[1])
+      prompt_content = self.data[img_idx]["content"][:-1]
+      prompt_style = self.data[img_idx]["style"][:-1]
       seed_img_id = self.data[img_idx]["article_id"]
-      prompt = self.build_prompt(prompt_content=self.data[img_idx]["content"][-1], prompt_style=self.data[img_idx]["style"][-1])
     else:
-      seed_img = LandscapeGenerator.resize_by_height(seed_img, size[1])
+      description = get_img_description(seed_img)
+      prompt_content = None
+      prompt_style = description["style"][:-1]
       seed_img_id = ""
-      prompt = self.build_prompt(img=seed_img)
 
-    makedirs(f"./imgs/{label}/", exist_ok=True)
+    seed_img = LandscapeGenerator.resize_by_height(seed_img, size[1])
     seed_img.save(f"./imgs/{label}/{label}_00.jpg")
 
     landscape_imgs = [seed_img]
@@ -142,9 +154,10 @@ class LandscapeGenerator:
     landscape_running_width = seed_img.size[0]
 
     img_in, mask_in = LandscapeGenerator.get_input_images(seed_img, keep_width=keep_width, size=size)
+    prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
 
     for i in range(1, n+1):
-      img_out_raw = self.gen_image(prompt, img_in, mask_in)
+      img_out_raw = self.gen_image(prompt, img_in, mask_in)[0]
       img_out_np = np.array(img_out_raw)[:, keep_width:]
       img_out = PImage.fromarray(img_out_np)
 
@@ -156,17 +169,13 @@ class LandscapeGenerator:
 
       prompt_rand = randint(0, 100)
       if prompt_rand < 30:
-        # content_style_idx = randint(0, len(self.data) - 1)
-        # prompt_content = self.data[content_style_idx]["content"][-1]
-        # prompt_style = self.data[content_style_idx]["style"][-1]
-        # landscape_ids.append(self.data[content_style_idx]["article_id"])
         landscape_ids.append(landscape_ids[-1])
         prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
-      elif prompt_rand < 180:
+      else:
         img_idx = randint(0, len(self.data) - 1)
         news_img = self.data[img_idx]["image"]
-        prompt_content = self.data[img_idx]["content"][-1]
-        prompt_style = self.data[img_idx]["style"][-1]
+        prompt_content = self.data[img_idx]["content"][:-1]
+        prompt_style = self.data[img_idx]["style"][:-1]
         landscape_ids.append(self.data[img_idx]["article_id"])
         prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
 
