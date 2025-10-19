@@ -68,8 +68,7 @@ class LandscapeGenerator:
     if right_img is not None:
       rkw = right_img.size[0]
       right_start = (size[0] - rkw) if (size[0] - rkw) > (3 * keep_width) else 3 * keep_width
-      right_end = min(size[0], 3 * keep_width + rkw)
-      bgd_np[:, right_start:right_end]= r_img_np[:, :right_end - right_start]
+      bgd_np[:, right_start:size[0]]= r_img_np[:, :size[0] - right_start]
 
     img_in = PImage.fromarray(bgd_np)
     mask_blurred = mask.filter(PImageFilter.GaussianBlur(radius=(4, 0)))
@@ -85,9 +84,9 @@ class LandscapeGenerator:
       description = get_img_description(img)
       prompt_style = description["style"][:-1]
     if prompt_content is None:
-      prompt_content = self.data[randint(0, len(self.data) - 1)]["content"][-1]
+      prompt_content = self.data[randint(0, len(self.data) - 1)]["content"][:-1]
     if prompt_style is None:
-      prompt_style = self.data[randint(0, len(self.data) - 1)]["style"][-1]
+      prompt_style = self.data[randint(0, len(self.data) - 1)]["style"][:-1]
 
     content_modifier_options = [
       "things on fire",
@@ -107,7 +106,7 @@ class LandscapeGenerator:
 
     return (
       f"Continuous and smooth version of {prompt_content}, but with {content_modifier} everywhere."
-      "Use the style of {prompt_style}"
+      f"Use the style of {prompt_style}."
     )
 
   def gen_image(self, prompt, img_in, mask_in):
@@ -118,7 +117,8 @@ class LandscapeGenerator:
       mask_image=mask_in,
       width=img_in.size[0], height=img_in.size[1],
       guidance_scale=16.0,
-      num_inference_steps=20,
+      num_inference_steps=24,
+      num_images_per_prompt=1,
     )
     return output.images[0]
 
@@ -172,9 +172,6 @@ class LandscapeGenerator:
 
         news_img = LandscapeGenerator.resize_by_height(news_img, size[1])
         img_in, mask_in = LandscapeGenerator.get_input_images(img_out, keep_width=keep_width, size=size, right_img=news_img)
-      # else:
-      #   landscape_ids.append(landscape_ids[-1])
-      #   prompt = self.build_prompt(img=img_out)
 
     landscape_np = np.zeros((size[1], landscape_running_width, 3), dtype=np.uint8)
     cw = 0
