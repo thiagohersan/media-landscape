@@ -71,7 +71,7 @@ class LandscapeGenerator:
       bgd_np[:, right_start:size[0]]= r_img_np[:, :size[0] - right_start]
 
     img_in = PImage.fromarray(bgd_np)
-    mask_blurred = mask.filter(PImageFilter.GaussianBlur(radius=(4, 0)))
+    mask_blurred = mask#.filter(PImageFilter.GaussianBlur(radius=(4, 0)))
 
     return img_in, mask_blurred
 
@@ -97,12 +97,12 @@ class LandscapeGenerator:
       "vultures and rats"
     ]
 
-    k = randint(1, 3)
+    k = randint(2, 4)
     selections = sample(content_modifier_options, k)
     content_modifier = ", ".join(selections)
 
     return (
-      f"Continuous and smooth version of {prompt_content}, but with {content_modifier} everywhere."
+      f"apocalyptic version of {prompt_content}, with {content_modifier} everywhere. "
       f"Use the style of {prompt_style}."
     )
 
@@ -114,22 +114,18 @@ class LandscapeGenerator:
       mask_image=mask_in,
       width=img_in.size[0], height=img_in.size[1],
       guidance_scale=16.0,
-      num_inference_steps=24,
+      num_inference_steps=32,
       num_images_per_prompt=n_images,
     )
     return output.images
 
   def prep_graft(self, limg, rimg, keep_width=256, right_offset=20, label="grafted"):
     orimg = rimg.crop((right_offset + keep_width, 0, rimg.size[0], rimg.size[1]))
-    orimg.save(f"./imgs/{label}_new-right.jpg")
+    orimg.save(f"./imgs/{label}b.jpg")
 
     rimg = rimg.crop((right_offset, 0, right_offset + keep_width, rimg.size[1]))
-    description = get_img_description(limg)
-    prompt_content = None
-    prompt_style = description["style"][:-1]
     img_in, mask_in = LandscapeGenerator.get_input_images(limg, keep_width=keep_width, size=(4*keep_width, limg.size[1]), right_img=rimg)
-    prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
-    return prompt, img_in, mask_in
+    return img_in, mask_in
 
   def gen_landscape(self, keep_width=256, size=(1440, 512), n=4, label="mural", seed_img=None):
     makedirs(f"./imgs/{label}/", exist_ok=True)
@@ -168,7 +164,7 @@ class LandscapeGenerator:
       img_in, mask_in = LandscapeGenerator.get_input_images(img_out, keep_width=keep_width, size=size)
 
       prompt_rand = randint(0, 100)
-      if prompt_rand < 30:
+      if prompt_rand < 70:
         landscape_ids.append(landscape_ids[-1])
         prompt = self.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
       else:

@@ -36,7 +36,8 @@ DEFAULT_IMAGE_DESCRIPTION_PROMPT_00 = (
 DEFAULT_IMAGE_DESCRIPTION_PROMPT = (
   "Describe this image's style and content separately but in a way that I can use them "
   "as prompts to generate similar images using generative diffusion models. "
-  "Use 24 words or less for each description. "
+  "Use 20 words or less for the content description, "
+  "and 10 words or less for the style description. "
   "When describing style, don't describe specific objects; "
   "and when describing content, focus on objects and subjects and don't describe style. "
   "Start both descriptions with 'an image that depicts ...'."
