@@ -30,6 +30,7 @@ body {
 .img-hor {
   display: block;
   height: 100%;
+  /* filter: sepia(80%); */
 }
 
 .button {

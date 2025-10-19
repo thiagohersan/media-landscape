@@ -5,11 +5,8 @@ const imageEls = [];
 
 let nImgIdx = 1;
 
-for (let i = 0; i < 8; i++) {
-  imagePaths.push(`./imgs/test00_${("00".concat(i)).slice(-2)}.jpg`);
-}
-for (let i = 0; i < 9; i++) {
-  imagePaths.push(`./imgs/test01_${("00".concat(i)).slice(-2)}.jpg`);
+for (let i = 0; i < 111; i++) {
+  imagePaths.push(`./imgs/ml20251019_${("00000".concat(i)).slice(-5)}.jpg`);
 }
 
 function elementPresent(element) {
@@ -29,7 +26,7 @@ function slide() {
     const container = document.getElementById('main-container');
     const cML = parseInt(window.getComputedStyle(container)["marginLeft"]);
     container.style.marginLeft = `${cML - SPEED_SLOW}px`;
-    setTimeout(() => slide(), 100);
+    setTimeout(() => slide(), 50);
   } else {
     tSpeed = 0;
   }
