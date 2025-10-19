@@ -6,3 +6,4 @@ __pycache__/
 *.ipynb.*
 env.py
 python/data
+www/imgs
