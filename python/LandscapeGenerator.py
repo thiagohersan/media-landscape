@@ -1,4 +1,4 @@
-from os import getenv, makedirs
+from os import getenv, listdir, makedirs
 
 try:
   from env import GEMINI_API_KEY
@@ -75,10 +75,6 @@ class LandscapeGenerator:
 
     return img_in, mask_blurred
 
-  def __init__(self, data, model):
-    self.data = data
-    self.pipe = LandscapeGenerator.get_pipeline(model)
-
   @classmethod
   def build_prompt(cls, prompt_content=None, prompt_style=None):
     content_modifier_options = [
@@ -101,6 +97,34 @@ class LandscapeGenerator:
       return f"{content_modifier} everywhere."
     else:
       return f"Apocalyptic version of {prompt_content}, with {content_modifier} everywhere. Using the style of {prompt_style}."
+
+  @classmethod
+  def stitch_images(cls, dir):
+    label = dir.split("/")[-1]
+    files = sorted([f for f in listdir(dir) if f.endswith(".jpg")])
+
+    total_w = 0
+    total_h = 0
+    imgs = []
+    for f in files:
+      img = PImage.open(f"{dir}/{f}")
+      iw,ih = img.size
+      imgs.append(img)
+      total_w += iw
+      total_h = ih
+
+    landscape_np = np.zeros((total_h, total_w, 3), dtype=np.uint8)
+    cw = 0
+    for img in imgs:
+      landscape_np[:, cw:cw + img.size[0]] = np.array(img)[:, :]
+      cw += img.size[0]
+
+    landscape_out = PImage.fromarray(landscape_np)
+    landscape_out.save(f"{dir}/{label}.jpg")
+
+  def __init__(self, data, model):
+    self.data = data
+    self.pipe = LandscapeGenerator.get_pipeline(model)
 
   def gen_image(self, prompt, img_in, mask_in, n_images=1):
     output = self.pipe(
