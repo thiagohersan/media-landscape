@@ -1,68 +1,54 @@
 const SPEED_SLOW = 1;
 
 const imagePaths = [];
-const imageEls = [];
+let headEls;
 
-let nImgIdx = 1;
-
-for (let i = 0; i < 111; i++) {
+for (let i = 0; i < 112; i++) {
   imagePaths.push(`./imgs/ml20251019_${("00000".concat(i)).slice(-5)}.jpg`);
 }
 
-function elementPresent(element) {
-  const rect = element.getBoundingClientRect();
-  return (
-    rect.left <= (window.innerWidth || document.documentElement.clientWidth)
-  );
-}
+// TODO: use modulus and shift the paths by current hour
+// 12am = 0%, 6am = 25%, 12pm = 50%, 6pm = 75%
 
 function slide() {
-  if (nImgIdx < imageEls.length) {
-    if (elementPresent(imageEls[nImgIdx])) {
-      console.log("new element", nImgIdx);
-      nImgIdx = (nImgIdx + 1);
-    }
+  const container = document.getElementById("main-container");
+  const cML = parseInt(window.getComputedStyle(container)["marginLeft"]);
+  const headElRect = headEls[0].getBoundingClientRect();
 
-    const container = document.getElementById('main-container');
-    const cML = parseInt(window.getComputedStyle(container)["marginLeft"]);
-    container.style.marginLeft = `${cML - SPEED_SLOW}px`;
-    setTimeout(() => slide(), 50);
+  if (headElRect.right < 0) {
+    container.style.marginLeft = `${cML + headElRect.width}px`;
+    container.appendChild(headEls[0]);
+    headEls[2].querySelector(".img-hor").setAttribute("src", headEls[2].dataset.src);
+    headEls = getHead();
   } else {
-    tSpeed = 0;
+    container.style.marginLeft = `${cML - SPEED_SLOW}px`;
   }
+
+  setTimeout(() => slide(), 50);
 }
 
-window.addEventListener('load', () => {
-  const container = document.getElementById('main-container');
-  const startButt = document.getElementById('start-button');
+function getHead() {
+  const container = document.getElementById("main-container");
+  return Array.from(container.getElementsByClassName("img-container")).slice(0, 3);
+}
+
+window.addEventListener("load", () => {
+  const container = document.getElementById("main-container");
 
   imagePaths.forEach((imgPath, i) => {
     const imgDivEl = document.createElement("div");
     imgDivEl.classList.add("img-container");
+    imgDivEl.setAttribute("data-src", `${imgPath}`);
     container.appendChild(imgDivEl);
 
     const imgEl = document.createElement("img");
-    imgEl.setAttribute("src", `${imgPath}`);
     imgEl.classList.add("img-hor");
 
-    if (i == 0) {
-      imgEl.style.width = `${window.innerWidth / 1.1}px`;
-    }
-
     imgDivEl.appendChild(imgEl);
-
-    imageEls.push(imgDivEl);
   });
 
-  startButt.style.display = "none";
-  startButt.addEventListener("click", (ev) => {
-    ev.target.style.display = "none";
-    requestAnimationFrame(slide);
-  });
+  headEls = getHead();
+  headEls.forEach(el => el.querySelector(".img-hor").setAttribute("src", el.dataset.src));
 
-  const urlHash = window.location.hash.toLowerCase();
-  console.log(urlHash);
-  if (!urlHash.includes("stop")) {
-    setTimeout(() => requestAnimationFrame(slide), 500);
-  }
+  setTimeout(() => slide(), 1000);
 });

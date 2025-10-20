@@ -32,29 +32,3 @@ body {
   height: 100%;
   /* filter: sepia(80%); */
 }
-
-.button {
-  position: absolute;
-  bottom: 100px;
-  right: 100px;
-  padding: 4px 8px;
-  background-color: #fff0;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  text-transform: uppercase;
-  border-bottom: #fff 3px solid;
-  font-size: 4vh;
-}
-
-.button:hover {
-  opacity: .75;
-}
-
-.button-roboto {
-  font-family: "Roboto", serif;
-  font-optical-sizing: auto;
-  font-weight: 500;
-  font-style: normal;
-  font-variation-settings: "width" 100;
-}
