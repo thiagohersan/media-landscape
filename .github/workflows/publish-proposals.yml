@@ -28,7 +28,7 @@ jobs:
         run: |
           cd ghp
           GITHUB_SHA_SHORT=$(echo $GITHUB_SHA | cut -c 1-8)
-          COMMIT_MSG=utils-${{ github.ref_name }}-$(git log --format=%h -1)
+          COMMIT_MSG=${{ github.ref_name }}-$(git log --format=%h -1)
           git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout --orphan gh-pages
