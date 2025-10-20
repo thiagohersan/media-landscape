@@ -3,7 +3,7 @@ const SPEED_SLOW = 1;
 const imagePaths = [];
 let headEls;
 
-for (let i = 0; i < 112; i++) {
+for (let i = 0; i < 177; i++) {
   imagePaths.push(`./imgs/ml20251019_${("00000".concat(i)).slice(-5)}.jpg`);
 }
 
@@ -29,7 +29,7 @@ function slide() {
 
 function getHead() {
   const container = document.getElementById("main-container");
-  return Array.from(container.getElementsByClassName("img-container")).slice(0, 3);
+  return Array.from(container.getElementsByClassName("img-container")).slice(0, 5);
 }
 
 window.addEventListener("load", () => {
