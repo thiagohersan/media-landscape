@@ -1,14 +1,17 @@
 const SPEED_SLOW = 1;
 
-const imagePaths = [];
+const imagePaths0 = [];
 let headEls;
 
-for (let i = 0; i < 177; i++) {
-  imagePaths.push(`./imgs/ml20251019_${("00000".concat(i)).slice(-5)}.jpg`);
+for (let i = 0; i < 244; i++) {
+  imagePaths0.push(`./imgs/2025-10-24/ml20251019_${("00000".concat(i)).slice(-5)}.jpg`);
 }
 
-// TODO: use modulus and shift the paths by current hour
-// 12am = 0%, 6am = 25%, 12pm = 50%, 6pm = 75%
+const hour = (new Date()).getHours();
+const offsetIdx = Math.floor((hour / 24) * imagePaths0.length);
+
+const firstN = imagePaths0.slice(0, offsetIdx);
+const imagePaths = imagePaths0.slice(offsetIdx).concat(firstN);
 
 function slide() {
   const container = document.getElementById("main-container");
@@ -18,7 +21,7 @@ function slide() {
   if (headElRect.right < 0) {
     container.style.marginLeft = `${cML + headElRect.width}px`;
     container.appendChild(headEls[0]);
-    headEls[2].querySelector(".img-hor").setAttribute("src", headEls[2].dataset.src);
+    headEls[4].querySelector(".img-hor").setAttribute("src", headEls[4].dataset.src);
     headEls = getHead();
   } else {
     container.style.marginLeft = `${cML - SPEED_SLOW}px`;
