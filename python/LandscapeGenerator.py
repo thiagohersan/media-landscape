@@ -39,41 +39,51 @@ class LandscapeGenerator:
     return src.resize((nw, height)).convert("RGB")
 
   @classmethod
-  def create_mask(cls, keep_width, size, right_keep_width=None):
-    img_in = PImage.new("L", size)
-    iw, ih = size
-    if right_keep_width is not None:
-      rkw = right_keep_width
-      mask_start = (iw - rkw) if (iw - rkw) > (3 * keep_width) else 3 * keep_width
-      img_in_pxs = [((i % iw) >= keep_width and (i % iw) < mask_start) * 255 for i in range(iw * ih)]
-    else:
-      img_in_pxs = [(i % iw >= keep_width) * 255 for i in range(iw * ih)]
-    img_in.putdata(img_in_pxs)
-    return img_in.convert("RGB")
+  def add_mask(cls, img, x, w):
+    iw, ih = img.size
+    x1 = min(x+w, iw)
+    img_np = np.array(img)
+    img_np[:, x:x1] = (0, 0, 0)
+    return PImage.fromarray(img_np, "RGB")
+
+  @classmethod
+  def add_crop(cls, src, sx0, crop_width, dst, mask, dx0):
+    if type(dst) == list or type(dst) == tuple:
+      dst = PImage.fromarray(255 * np.ones((dst[1], dst[0], 3), dtype=np.uint8), "RGB")
+      mask = dst.copy()
+
+    # assume sh == dh
+    dw,dh = dst.size
+    sw,sh = src.size
+    sx1 = min(sx0 + crop_width, sw)
+    dx1 = min(dx0 + sx1 - sx0, dw)
+    actual_crop_width = min(sx1 - sx0, dx1 - dx0)
+    dst.paste(src.crop((sx0, 0, sx0 + actual_crop_width, sh)), (dx0, 0))
+    nmask = cls.add_mask(mask, dx0, actual_crop_width)
+    return dst, nmask
 
   @classmethod
   def get_input_images(cls, left_img, keep_width, size, right_img=None):
-    l_img_np = np.array(cls.resize_by_height(left_img, height=size[1]))
+    left_img = cls.resize_by_height(left_img, height=size[1])
+    img, mask = cls.add_crop(left_img, left_img.size[0] - keep_width, keep_width, size, None, 0)
 
     if right_img is not None:
-      r_img_np = np.array(cls.resize_by_height(right_img, height=size[1]))
-      bgd_np = np.array(cls.create_mask(keep_width=keep_width, size=size, right_keep_width=right_img.size[0]))
-      mask = cls.create_mask(keep_width=keep_width, size=size, right_keep_width=right_img.size[0])
-    else:
-      bgd_np = np.array(cls.create_mask(keep_width=keep_width, size=size))
-      mask = cls.create_mask(keep_width=keep_width, size=size)
+      right_img = cls.resize_by_height(right_img, height=size[1])
+      mask_start = (img.size[0] - right_img.size[0]) if (img.size[0] - right_img.size[0]) > (3 * keep_width) else 3 * keep_width
+      img_in, mask_in = cls.add_crop(right_img, 0, right_img.size[0], img, mask, mask_start)
 
-    bgd_np[:, :keep_width] = l_img_np[:, -keep_width:]
-
-    if right_img is not None:
-      rkw = right_img.size[0]
-      right_start = (size[0] - rkw) if (size[0] - rkw) > (3 * keep_width) else 3 * keep_width
-      bgd_np[:, right_start:size[0]]= r_img_np[:, :size[0] - right_start]
-
-    img_in = PImage.fromarray(bgd_np)
     mask_blurred = mask#.filter(PImageFilter.GaussianBlur(radius=(4, 0)))
 
-    return img_in, mask_blurred
+    return img, mask_blurred
+
+  @classmethod
+  def prep_graft(cls, limg, rimg, keep_width=256, right_offset=20, label="grafted"):
+    orimg = rimg.crop((right_offset + keep_width, 0, rimg.size[0], rimg.size[1]))
+    orimg.save(f"./imgs/{label}b.jpg")
+
+    rimg = rimg.crop((right_offset, 0, right_offset + keep_width, rimg.size[1]))
+    img_in, mask_in = cls.get_input_images(limg, keep_width=keep_width, size=(4*keep_width, limg.size[1]), right_img=rimg)
+    return img_in, mask_in
 
   @classmethod
   def build_prompt(cls, prompt_content=None, prompt_style=None):
@@ -138,14 +148,6 @@ class LandscapeGenerator:
       num_images_per_prompt=n_images,
     )
     return output.images
-
-  def prep_graft(self, limg, rimg, keep_width=256, right_offset=20, label="grafted"):
-    orimg = rimg.crop((right_offset + keep_width, 0, rimg.size[0], rimg.size[1]))
-    orimg.save(f"./imgs/{label}b.jpg")
-
-    rimg = rimg.crop((right_offset, 0, right_offset + keep_width, rimg.size[1]))
-    img_in, mask_in = LandscapeGenerator.get_input_images(limg, keep_width=keep_width, size=(4*keep_width, limg.size[1]), right_img=rimg)
-    return img_in, mask_in
 
   def gen_landscape(self, keep_width=256, size=(1440, 512), n=4, label="mural", seed_img=None):
     makedirs(f"./imgs/{label}/", exist_ok=True)
