@@ -70,7 +70,7 @@ class LandscapeGenerator:
     if right_img is not None:
       right_img = cls.resize_by_height(right_img, height=size[1])
       mask_start = (img.size[0] - right_img.size[0]) if (img.size[0] - right_img.size[0]) > (3 * keep_width) else 3 * keep_width
-      img_in, mask_in = cls.add_crop(right_img, 0, right_img.size[0], img, mask, mask_start)
+      img, mask = cls.add_crop(right_img, 0, right_img.size[0], img, mask, mask_start)
 
     mask_blurred = mask#.filter(PImageFilter.GaussianBlur(radius=(4, 0)))
 
