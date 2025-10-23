@@ -86,7 +86,7 @@ class LandscapeGenerator:
     return img_in, mask_in
 
   @classmethod
-  def build_prompt(cls, prompt_content=None, prompt_style=None):
+  def build_prompt(cls, prompt_content=None):
     content_modifier_options = [
       "things on fire",
       "floods",
@@ -183,22 +183,24 @@ class LandscapeGenerator:
       img_out.save(f"./imgs/{label}/{label}_{('0'+str(i))[-2:]}.jpg")
 
       img_in, mask_in = LandscapeGenerator.get_input_images(img_out, keep_width=keep_width, size=size)
-      prompt = LandscapeGenerator.build_prompt(prompt_content=None, prompt_style=None)
+      prompt = LandscapeGenerator.build_prompt(prompt_content=None)
 
       prompt_rand = randint(0, 100)
-      if prompt_rand < 60:
+      if prompt_rand < 10:
         landscape_ids.append(landscape_ids[-1])
       elif prompt_rand < 90:
         img_idx = randint(0, len(self.data) - 1)
         landscape_ids.append(self.data[img_idx]["article_id"])
-        prompt = LandscapeGenerator.build_prompt(prompt_content=self.data[img_idx]["content"])
+        prompt_content = self.data[img_idx]["content"][:-1]
+        prompt = LandscapeGenerator.build_prompt(prompt_content=prompt_content)
       else:
         img_idx = randint(0, len(self.data) - 1)
         news_img = self.data[img_idx]["image"]
         landscape_ids.append(self.data[img_idx]["article_id"])
+        prompt_content = self.data[img_idx]["content"][:-1]
         news_img = LandscapeGenerator.resize_by_height(news_img, size[1])
         img_in, mask_in = LandscapeGenerator.get_input_images(img_out, keep_width=keep_width, size=size, right_img=news_img)
-        prompt = LandscapeGenerator.build_prompt(prompt_content=self.data[img_idx]["content"])
+        prompt = LandscapeGenerator.build_prompt(prompt_content=prompt_content)
 
     landscape_np = np.zeros((size[1], landscape_running_width, 3), dtype=np.uint8)
     cw = 0
