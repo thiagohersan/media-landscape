@@ -103,10 +103,10 @@ class LandscapeGenerator:
     selections = sample(content_modifier_options, k)
     content_modifier = ", ".join(selections)
 
-    if prompt_content is None or prompt_style is None:
-      return f"{content_modifier} everywhere."
+    if prompt_content is None:
+      return f"Futuristic. Apocalyptic. {content_modifier} everywhere."
     else:
-      return f"Apocalyptic version of {prompt_content}, with {content_modifier} everywhere. Using the style of {prompt_style}."
+      return f"Apocalyptic futuristic version of {prompt_content}, with {content_modifier} everywhere."
 
   @classmethod
   def stitch_images(cls, dir):
@@ -139,11 +139,12 @@ class LandscapeGenerator:
   def gen_image(self, prompt, img_in, mask_in, n_images=1):
     output = self.pipe(
       prompt=prompt,
-      negative_prompt="repetitive, distortion, glitch, borders, stretched, frames, breaks, multiple rows, gore, zombies, violence, splits, maps, diagrams, text, font, logos, branding",
+      negative_prompt="people, black people, indian people, asian people, repetitive, distortion, glitch, borders, stretched, frames, breaks, multiple rows, gore, zombies, violence, splits, maps, diagrams, text, font, logos, branding",
       image=img_in,
       mask_image=mask_in,
       width=img_in.size[0], height=img_in.size[1],
       guidance_scale=16.0,
+      strength=1.0,
       num_inference_steps=32,
       num_images_per_prompt=n_images,
     )
@@ -157,11 +158,9 @@ class LandscapeGenerator:
       seed_img = self.data[img_idx]["image"]
       seed_img_id = self.data[img_idx]["article_id"]
       prompt_content = self.data[img_idx]["content"][:-1]
-      prompt_style = self.data[img_idx]["style"][:-1]
     else:
       description = get_img_description(seed_img)
       prompt_content = description["content"][:-1]
-      prompt_style = description["style"][:-1]
       seed_img_id = ""
 
     seed_img = LandscapeGenerator.resize_by_height(seed_img, size[1])
@@ -172,7 +171,7 @@ class LandscapeGenerator:
     landscape_running_width = seed_img.size[0]
 
     img_in, mask_in = LandscapeGenerator.get_input_images(seed_img, keep_width=keep_width, size=size)
-    prompt = LandscapeGenerator.build_prompt(prompt_content=prompt_content, prompt_style=prompt_style)
+    prompt = LandscapeGenerator.build_prompt(prompt_content=prompt_content)
 
     for i in range(1, n+1):
       img_out_raw = self.gen_image(prompt, img_in, mask_in)[0]
@@ -187,14 +186,19 @@ class LandscapeGenerator:
       prompt = LandscapeGenerator.build_prompt(prompt_content=None, prompt_style=None)
 
       prompt_rand = randint(0, 100)
-      if prompt_rand < 40:
+      if prompt_rand < 60:
         landscape_ids.append(landscape_ids[-1])
+      elif prompt_rand < 90:
+        img_idx = randint(0, len(self.data) - 1)
+        landscape_ids.append(self.data[img_idx]["article_id"])
+        prompt = LandscapeGenerator.build_prompt(prompt_content=self.data[img_idx]["content"])
       else:
         img_idx = randint(0, len(self.data) - 1)
         news_img = self.data[img_idx]["image"]
         landscape_ids.append(self.data[img_idx]["article_id"])
         news_img = LandscapeGenerator.resize_by_height(news_img, size[1])
         img_in, mask_in = LandscapeGenerator.get_input_images(img_out, keep_width=keep_width, size=size, right_img=news_img)
+        prompt = LandscapeGenerator.build_prompt(prompt_content=self.data[img_idx]["content"])
 
     landscape_np = np.zeros((size[1], landscape_running_width, 3), dtype=np.uint8)
     cw = 0

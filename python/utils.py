@@ -11,6 +11,7 @@ import string
 
 from PIL import Image as PImage
 from sklearn.feature_extraction.text import CountVectorizer
+from time import sleep
 
 try:
   from torch.cuda import empty_cache
@@ -36,7 +37,7 @@ DEFAULT_IMAGE_DESCRIPTION_PROMPT_00 = (
 DEFAULT_IMAGE_DESCRIPTION_PROMPT = (
   "Describe this image's style and content separately but in a way that I can use them "
   "as prompts to generate similar images using generative diffusion models. "
-  "Use 20 words or less for the content description, "
+  "Use 24 words or less for the content description, "
   "and 10 words or less for the style description. "
   "When describing style, don't describe specific objects; "
   "and when describing content, focus on objects and subjects and don't describe style. "
@@ -151,6 +152,7 @@ def get_articles(*, q=None, cat=None, n_articles=10):
   results = []
   n_queries = n_articles//10 if n_articles%10==0 else n_articles//10+1
   for idx in range(n_queries):
+    sleep(1)
     res = requests.get(NEWSDATA_URL, params=news_params)
     res_obj = res.json()
     if res_obj["status"] == "success":
