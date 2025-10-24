@@ -27,7 +27,7 @@ function slide() {
     container.style.marginLeft = `${cML - SPEED_SLOW}px`;
   }
 
-  setTimeout(() => slide(), 50);
+  setTimeout(() => slide(), 15);
 }
 
 function getHead() {
