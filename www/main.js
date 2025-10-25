@@ -3,8 +3,8 @@ const SPEED_SLOW = 1;
 const imagePaths0 = [];
 let headEls;
 
-for (let i = 0; i < 257; i++) {
-  imagePaths0.push(`./imgs/2025-10-22/20251022_${("00000".concat(i)).slice(-5)}.jpg`);
+for (let i = 0; i < 262; i++) {
+  imagePaths0.push(`./imgs/2025-10-23/20251023_${("00000".concat(i)).slice(-5)}.jpg`);
 }
 
 const hour = (new Date()).getHours();
