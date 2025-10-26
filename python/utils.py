@@ -158,6 +158,8 @@ def get_articles(*, q=None, cat=None, n_articles=10):
     if res_obj["status"] == "success":
       results += res_obj["results"]
       news_params["page"] = res_obj["nextPage"]
+      if news_params["page"] == None:
+        break
     else:
       raise Exception("Error in NewsData API", res_obj)
 
